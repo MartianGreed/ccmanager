@@ -1,0 +1,47 @@
+# CCManager Configuration
+# Copy this file to ~/.config/ccmanager/config.yaml
+
+# Pomodoro timer settings
+pomodoro:
+  work_minutes: 25
+  short_break_minutes: 5
+  long_break_minutes: 15
+  sessions_before_long_break: 4
+  multiplier: 1.5
+
+# Streak settings
+streak:
+  timeout_seconds: 30
+  multiplier_cap: 10.0
+
+# Scoring
+scoring:
+  points_per_action: 10
+  points_task_complete: 100
+  points_urgent_handled: 500
+  points_pomodoro_complete: 1000
+
+# Focus bonus
+focus:
+  bonus_minutes: 5
+  bonus_multiplier: 1.2
+
+# APM tracking
+apm:
+  window_seconds: 60
+
+# Monitor settings
+monitor:
+  poll_interval_ms: 500
+
+# UI settings
+ui:
+  double_tap_threshold_ms: 300
+  newline_sequence: "\\"
+  session_list_width_pct: 35  # 20-50
+  editor: "nvim"  # editor to open with 'e' key
+
+# Workspace/worktree settings
+workspace:
+  strategy: "git"          # "git" or "jj"
+  base_path: "~/worktrees"

@@ -1,0 +1,6 @@
+/bin/
+/ccmanager
+*.db
+.claude-modified-files
+.claude/
+thoughts/
