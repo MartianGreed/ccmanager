@@ -72,7 +72,7 @@ func New(dbPath string) (*Store, error) {
 	store := &Store{db: db}
 
 	if err := store.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
@@ -184,7 +184,7 @@ func (s *Store) GetControlGroups() (map[int]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get control groups: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	groups := make(map[int]string)
 	for rows.Next() {
@@ -316,7 +316,7 @@ func (s *Store) GetRecentActivity(limit int) ([]ActivityEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get recent activity: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []ActivityEntry
 	for rows.Next() {
@@ -361,7 +361,7 @@ func (s *Store) GetAllSessions() ([]Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get all sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []Session
 	for rows.Next() {
@@ -443,7 +443,7 @@ func (s *Store) GetRecentPaths(limit int) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get recent paths: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var paths []string
 	for rows.Next() {

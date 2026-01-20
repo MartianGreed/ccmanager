@@ -29,7 +29,7 @@ func ParseSessionFile(path string) (*SessionUsage, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	usage := &SessionUsage{
 		SessionID:   filepath.Base(strings.TrimSuffix(path, ".jsonl")),
@@ -78,7 +78,7 @@ func ParseSessionFileTail(path string, tailBytes int64) (*SessionUsage, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
 	if err != nil {

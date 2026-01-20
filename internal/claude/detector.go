@@ -203,21 +203,3 @@ func (d *Detector) getLastNonEmptyLine(content string) string {
 	}
 	return ""
 }
-
-func (d *Detector) endsWithPrompt(content string) bool {
-	trimmed := strings.TrimSpace(content)
-	if len(trimmed) == 0 {
-		return false
-	}
-	checkLen := 20
-	if len(trimmed) < checkLen {
-		checkLen = len(trimmed)
-	}
-	suffix := trimmed[len(trimmed)-checkLen:]
-	for _, pattern := range d.idlePatterns {
-		if pattern.MatchString(suffix) {
-			return true
-		}
-	}
-	return false
-}

@@ -276,7 +276,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "y":
 				for _, s := range m.sessions {
-					m.tmux.KillSession(s.Name)
+					_ = m.tmux.KillSession(s.Name)
 				}
 				return m, tea.Quit
 			case "n":
@@ -353,7 +353,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.addActivity("", "Workspace creation failed: %v", err)
 						} else {
 							if m.store != nil {
-								m.store.SaveSessionWorkspace(name, wsPath, path)
+								_ = m.store.SaveSessionWorkspace(name, wsPath, path)
 							}
 							path = wsPath
 						}
@@ -376,17 +376,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					m.focused = name
 					m.engine.SetFocusSession(name)
-					m.tmux.SwitchClient(name)
+					_ = m.tmux.SwitchClient(name)
 
 					if groupNum := m.engine.ControlGroups().FirstFreeGroup(); groupNum > 0 {
 						m.engine.ControlGroups().Assign(groupNum, name)
 						if m.store != nil {
-							m.store.SetControlGroup(groupNum, name)
+							_ = m.store.SetControlGroup(groupNum, name)
 						}
 					}
 
 					if m.store != nil {
-						m.store.AddRecentPath(path)
+						_ = m.store.AddRecentPath(path)
 					}
 
 					m.sessions = m.monitor.Sessions()
@@ -426,7 +426,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if text != "" && m.selected < len(m.sessions) {
 					session := m.sessions[m.selected]
-					m.tmux.SendKeysToPane(session.Name, session.ClaudePane, text)
+					_ = m.tmux.SendKeysToPane(session.Name, session.ClaudePane, text)
 					m.addActivity(session.Name, "Sent: %s", text)
 					m.addToPromptHistory(text)
 				}
@@ -485,7 +485,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "shift+tab":
 				if m.selected < len(m.sessions) {
 					session := m.sessions[m.selected]
-					m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "BTab")
+					_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "BTab")
 					m.addActivity(session.Name, "Sent Shift+Tab (cycle mode)")
 				}
 				return m, tea.Batch(cmds...)
@@ -544,7 +544,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 				m.engine.ControlGroups().Assign(groupNum, session)
 				m.engine.RecordAction(game.ActionGroupAssign)
 				if m.store != nil {
-					m.store.SetControlGroup(groupNum, session)
+					_ = m.store.SetControlGroup(groupNum, session)
 				}
 			}
 		}
@@ -566,7 +566,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		if len(m.sessions) > 0 {
 			session := m.sessions[m.selected]
 			if session.State == claude.StateUrgent {
-				m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Up")
+				_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Up")
 				return nil
 			}
 			m.selected = (m.selected - 1 + len(m.sessions)) % len(m.sessions)
@@ -578,7 +578,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		if len(m.sessions) > 0 {
 			session := m.sessions[m.selected]
 			if session.State == claude.StateUrgent {
-				m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Down")
+				_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Down")
 				return nil
 			}
 			m.selected = (m.selected + 1) % len(m.sessions)
@@ -590,12 +590,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		if m.selected < len(m.sessions) {
 			session := m.sessions[m.selected]
 			if session.State == claude.StateUrgent {
-				m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Enter")
+				_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Enter")
 				return nil
 			}
 			m.focused = session.Name
 			m.engine.SetFocusSession(session.Name)
-			m.tmux.SwitchClient(session.Name)
+			_ = m.tmux.SwitchClient(session.Name)
 			m.engine.RecordAction(game.ActionSwitch)
 		}
 
@@ -609,7 +609,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	case "shift+tab":
 		if m.selected < len(m.sessions) {
 			session := m.sessions[m.selected]
-			m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "BTab")
+			_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "BTab")
 			m.addActivity(session.Name, "Sent Shift+Tab (cycle mode)")
 		}
 
@@ -631,7 +631,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			if doubleTap {
 				m.focused = session
 				m.engine.SetFocusSession(session)
-				m.tmux.SwitchClient(session)
+				_ = m.tmux.SwitchClient(session)
 				m.engine.RecordAction(game.ActionSwitch)
 			}
 		}
@@ -659,14 +659,14 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	case "x":
 		if m.selected < len(m.sessions) {
 			session := m.sessions[m.selected]
-			m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Escape")
+			_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Escape")
 			m.addActivity(session.Name, "Sent Escape (cancel)")
 		}
 
 	case "c":
 		if m.selected < len(m.sessions) {
 			session := m.sessions[m.selected]
-			m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "C-c")
+			_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "C-c")
 			m.addActivity(session.Name, "Sent Ctrl+C (interrupt)")
 		}
 
@@ -675,7 +675,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 			now := time.Now()
 			if m.deletePressed && now.Sub(m.deleteTime) < 500*time.Millisecond {
 				session := m.sessions[m.selected]
-				m.tmux.KillSession(session.Name)
+				_ = m.tmux.KillSession(session.Name)
 				m.addActivity(session.Name, "Session deleted")
 				m.sessions = m.monitor.Sessions()
 				m.deletePressed = false
@@ -722,19 +722,14 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 				if editor == "" {
 					editor = "nvim"
 				}
-				m.tmux.NewWindow(session.Name, "editor", path, editor+" .")
-				m.tmux.SwitchClient(session.Name)
+				_ = m.tmux.NewWindow(session.Name, "editor", path, editor+" .")
+				_ = m.tmux.SwitchClient(session.Name)
 				m.addActivity(session.Name, "Opened %s", editor)
 			}
 		}
 	}
 
 	return nil
-}
-
-func (m *Model) generateSessionName() string {
-	dir, _ := os.Getwd()
-	return m.generateSessionNameFromPath(dir)
 }
 
 func (m *Model) generateSessionNameFromPath(dir string) string {
@@ -853,7 +848,7 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 		m.addActivity(event.Session, "Session discovered")
 		m.sessions = m.monitor.Sessions()
 		if m.store != nil {
-			m.store.CreateSession(event.Session)
+			_ = m.store.CreateSession(event.Session)
 		}
 
 	case daemon.EventSessionClosed:
@@ -870,9 +865,9 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 				if delErr := m.workspaceManager.DeleteWorkspace(sourceRepo, wsPath); delErr != nil {
 					m.addActivity(event.Session, "Workspace cleanup failed: %v", delErr)
 				}
-				m.store.DeleteSessionWorkspace(event.Session)
+				_ = m.store.DeleteSessionWorkspace(event.Session)
 			}
-			m.store.DeleteSession(event.Session)
+			_ = m.store.DeleteSession(event.Session)
 		}
 
 	case daemon.EventStateChanged:
@@ -884,7 +879,7 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 			m.interactiveMode = false
 		}
 		if m.store != nil {
-			m.store.UpdateSessionLastSeen(event.Session)
+			_ = m.store.UpdateSessionLastSeen(event.Session)
 		}
 
 	case daemon.EventTaskCompleted:
@@ -899,7 +894,7 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 			m.selectByName(event.Session)
 		}
 		if m.store != nil {
-			m.store.UpdateSessionLastSeen(event.Session)
+			_ = m.store.UpdateSessionLastSeen(event.Session)
 		}
 
 	case daemon.EventDebug:
@@ -925,7 +920,7 @@ func (m *Model) validateControlGroups() {
 		if !sessionNames[sessionName] {
 			m.engine.ControlGroups().Remove(groupNum, sessionName)
 			if m.store != nil {
-				m.store.RemoveFromControlGroup(groupNum, sessionName)
+				_ = m.store.RemoveFromControlGroup(groupNum, sessionName)
 			}
 		}
 	}
@@ -1072,19 +1067,19 @@ func (m *Model) handleInteractiveKey(msg tea.KeyMsg) tea.Cmd {
 		m.focused = ""
 		return nil
 	case "up", "k":
-		m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Up")
+		_ = m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Up")
 		return nil
 	case "down", "j":
-		m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Down")
+		_ = m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Down")
 		return nil
 	case "enter":
-		m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Enter")
+		_ = m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "Enter")
 		return nil
 	case "y":
-		m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "y")
+		_ = m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "y")
 		return nil
 	case "n":
-		m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "n")
+		_ = m.tmux.SendKeysToPaneRaw(focusedSession.Name, focusedSession.ClaudePane, "n")
 		return nil
 	case "i":
 		m.promptMode = true

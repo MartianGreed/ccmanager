@@ -147,7 +147,7 @@ func (a *App) saveState() {
 	score, lastScoreDate, pomodoroState, pomodoroRemaining := a.engine.State()
 
 	now := time.Now()
-	a.store.UpdateGameState(&store.GameState{
+	_ = a.store.UpdateGameState(&store.GameState{
 		CurrentScore:      score,
 		LastScoreDate:     lastScoreDate,
 		LastActionAt:      &now,
@@ -157,6 +157,6 @@ func (a *App) saveState() {
 
 	// Save control groups
 	for groupNum, session := range a.engine.ControlGroups().All() {
-		a.store.SetControlGroup(groupNum, session)
+		_ = a.store.SetControlGroup(groupNum, session)
 	}
 }

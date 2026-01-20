@@ -18,25 +18,16 @@ var (
 	colorUrgent    = lipgloss.Color("#FF4444")
 	colorSuccess   = lipgloss.Color("#44FF44")
 	colorMuted     = lipgloss.Color("#666666")
-	colorBg        = lipgloss.Color("#1A1A2E")
 )
 
 // Styles
 var (
-	headerStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colorPrimary)
-
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorSecondary)
 
 	statStyle = lipgloss.NewStyle().
 			Foreground(colorPrimary)
-
-	borderStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorPrimary)
 
 	selectedStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -503,47 +494,6 @@ func (m *Model) viewPreview(width, height int) string {
 	return strings.Join(lines[:height], "\n")
 }
 
-func (m *Model) viewActivityLog(width, height int) string {
-	var lines []string
-
-	// Header
-	header := sectionHeaderStyle.Render(" ACTIVITY")
-	lines = append(lines, header)
-
-	// Calculate how many entries we can show
-	maxEntries := height - 1
-	if maxEntries < 1 {
-		maxEntries = 1
-	}
-
-	for i := 0; i < maxEntries && i < len(m.activityLog); i++ {
-		entry := m.activityLog[i]
-		timeStr := entry.Time.Format("15:04:05")
-		sessionStr := ""
-		if entry.Session != "" {
-			sessionStr = fmt.Sprintf("[%-8s] ", truncate(entry.Session, 8))
-		} else {
-			sessionStr = strings.Repeat(" ", 11)
-		}
-
-		msg := entry.Message
-		maxMsgLen := width - 22 // time(8) + space(1) + session(11) + padding(2)
-		if maxMsgLen > 0 && len(msg) > maxMsgLen {
-			msg = msg[:maxMsgLen-1] + "…"
-		}
-
-		line := fmt.Sprintf(" %s %s%s", timeStr, sessionStr, msg)
-		lines = append(lines, mutedStyle.Render(line))
-	}
-
-	// Pad to fill height
-	for len(lines) < height {
-		lines = append(lines, "")
-	}
-
-	return strings.Join(lines[:height], "\n")
-}
-
 func (m *Model) viewPromptPanel(width, height int) string {
 	var lines []string
 
@@ -814,28 +764,6 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-1] + "…"
 }
 
-func wrapText(s string, width int) []string {
-	if width <= 0 {
-		return []string{s}
-	}
-	var lines []string
-	for len(s) > width {
-		lines = append(lines, s[:width])
-		s = s[width:]
-	}
-	if len(s) > 0 {
-		lines = append(lines, s)
-	}
-	return lines
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func formatUsageCompact(inputTokens, outputTokens int64, cost float64) string {
 	inStr := formatTokensLarge(inputTokens)
 	outStr := formatTokensLarge(outputTokens)
@@ -850,25 +778,4 @@ func formatTokensLarge(n int64) string {
 		return fmt.Sprintf("%.1fk", float64(n)/1000)
 	}
 	return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
-}
-
-func stripANSI(s string) string {
-	var result strings.Builder
-	i := 0
-	for i < len(s) {
-		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
-			// Skip ANSI escape sequence
-			i += 2
-			for i < len(s) && !((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z')) {
-				i++
-			}
-			if i < len(s) {
-				i++ // Skip the final letter
-			}
-		} else {
-			result.WriteByte(s[i])
-			i++
-		}
-	}
-	return result.String()
 }

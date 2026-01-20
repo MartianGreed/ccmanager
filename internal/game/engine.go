@@ -72,11 +72,6 @@ type Engine struct {
 	// Focus tracking
 	focusSession string
 	focusStart   time.Time
-
-	// Callbacks
-	onScoreChange    func(score int)
-	onStreakChange   func(multiplier float64)
-	onPomodoroChange func(state PomodoroState, remaining time.Duration)
 }
 
 // NewEngine creates a new game engine
@@ -141,17 +136,6 @@ func (e *Engine) RecordAction(actionType ActionType) int {
 	e.apm.RecordAction(now)
 
 	return 0
-}
-
-func (e *Engine) getBasePoints(actionType ActionType) int {
-	switch actionType {
-	case ActionTaskComplete:
-		return e.config.PointsTaskComplete
-	case ActionUrgentHandled:
-		return e.config.PointsUrgentHandled
-	default:
-		return e.config.PointsAction
-	}
 }
 
 // SetFocusSession updates the focused session

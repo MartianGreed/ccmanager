@@ -72,7 +72,7 @@ func (d pathDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		sourceTag = d.styles.dimmed.Render(" [cwd]")
 	}
 
-	fmt.Fprintf(w, "%s%s\n%s\n", title, sourceTag, desc)
+	_, _ = fmt.Fprintf(w, "%s%s\n%s\n", title, sourceTag, desc)
 }
 
 func truncatePath(path string, maxLen int) string {
