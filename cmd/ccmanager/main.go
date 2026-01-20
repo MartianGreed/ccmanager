@@ -15,7 +15,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error initializing: %v\n", err)
 		os.Exit(1)
 	}
-	defer application.Close()
+	defer func() { _ = application.Close() }()
 
 	if err := application.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

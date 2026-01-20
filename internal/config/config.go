@@ -9,11 +9,11 @@ import (
 )
 
 type PomodoroConfig struct {
-	WorkMinutes            int     `yaml:"work_minutes"`
-	ShortBreakMinutes      int     `yaml:"short_break_minutes"`
-	LongBreakMinutes       int     `yaml:"long_break_minutes"`
-	SessionsBeforeLongBreak int    `yaml:"sessions_before_long_break"`
-	Multiplier             float64 `yaml:"multiplier"`
+	WorkMinutes             int     `yaml:"work_minutes"`
+	ShortBreakMinutes       int     `yaml:"short_break_minutes"`
+	LongBreakMinutes        int     `yaml:"long_break_minutes"`
+	SessionsBeforeLongBreak int     `yaml:"sessions_before_long_break"`
+	Multiplier              float64 `yaml:"multiplier"`
 }
 
 type StreakConfig struct {
@@ -22,9 +22,9 @@ type StreakConfig struct {
 }
 
 type ScoringConfig struct {
-	PointsPerAction     int `yaml:"points_per_action"`
-	PointsTaskComplete  int `yaml:"points_task_complete"`
-	PointsUrgentHandled int `yaml:"points_urgent_handled"`
+	PointsPerAction        int `yaml:"points_per_action"`
+	PointsTaskComplete     int `yaml:"points_task_complete"`
+	PointsUrgentHandled    int `yaml:"points_urgent_handled"`
 	PointsPomodoroComplete int `yaml:"points_pomodoro_complete"`
 }
 
@@ -42,10 +42,10 @@ type MonitorConfig struct {
 }
 
 type UIConfig struct {
-	DoubleTapThresholdMs    int    `yaml:"double_tap_threshold_ms"`
-	NewlineSequence         string `yaml:"newline_sequence"`
-	SessionListWidthPct     int    `yaml:"session_list_width_pct"`
-	Editor                  string `yaml:"editor"`
+	DoubleTapThresholdMs int    `yaml:"double_tap_threshold_ms"`
+	NewlineSequence      string `yaml:"newline_sequence"`
+	SessionListWidthPct  int    `yaml:"session_list_width_pct"`
+	Editor               string `yaml:"editor"`
 }
 
 type WorkspaceConfig struct {
@@ -68,11 +68,11 @@ type Config struct {
 func Default() *Config {
 	return &Config{
 		Pomodoro: PomodoroConfig{
-			WorkMinutes:            25,
-			ShortBreakMinutes:      5,
-			LongBreakMinutes:       15,
+			WorkMinutes:             25,
+			ShortBreakMinutes:       5,
+			LongBreakMinutes:        15,
 			SessionsBeforeLongBreak: 4,
-			Multiplier:             1.5,
+			Multiplier:              1.5,
 		},
 		Streak: StreakConfig{
 			TimeoutSeconds: 30,
@@ -95,10 +95,10 @@ func Default() *Config {
 			PollIntervalMs: 500,
 		},
 		UI: UIConfig{
-			DoubleTapThresholdMs:    300,
-			NewlineSequence:         "\\",
-			SessionListWidthPct:     35,
-			Editor:                  "nvim",
+			DoubleTapThresholdMs: 300,
+			NewlineSequence:      "\\",
+			SessionListWidthPct:  35,
+			Editor:               "nvim",
 		},
 		Workspace: WorkspaceConfig{
 			Strategy: "git",

@@ -11,11 +11,11 @@ import (
 type SessionState int
 
 const (
-	StateUnknown SessionState = iota
-	StateIdle                 // Prompt visible, waiting for input
-	StateActive               // User recently typed
-	StateThinking             // Claude is thinking
-	StateUrgent               // Needs immediate input
+	StateUnknown  SessionState = iota
+	StateIdle                  // Prompt visible, waiting for input
+	StateActive                // User recently typed
+	StateThinking              // Claude is thinking
+	StateUrgent                // Needs immediate input
 )
 
 func (s SessionState) String() string {
@@ -202,22 +202,4 @@ func (d *Detector) getLastNonEmptyLine(content string) string {
 		}
 	}
 	return ""
-}
-
-func (d *Detector) endsWithPrompt(content string) bool {
-	trimmed := strings.TrimSpace(content)
-	if len(trimmed) == 0 {
-		return false
-	}
-	checkLen := 20
-	if len(trimmed) < checkLen {
-		checkLen = len(trimmed)
-	}
-	suffix := trimmed[len(trimmed)-checkLen:]
-	for _, pattern := range d.idlePatterns {
-		if pattern.MatchString(suffix) {
-			return true
-		}
-	}
-	return false
 }

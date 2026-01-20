@@ -41,9 +41,9 @@ type PomodoroTimer struct {
 	completed   int // Pomodoros completed in current cycle
 
 	// Config
-	workMinutes       int
-	shortBreakMinutes int
-	longBreakMinutes  int
+	workMinutes             int
+	shortBreakMinutes       int
+	longBreakMinutes        int
 	sessionsBeforeLongBreak int
 
 	// Callbacks
