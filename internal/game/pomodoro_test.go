@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	testWorkMinutes       = 25
-	testShortBreakMinutes = 5
-	testLongBreakMinutes  = 15
+	testWorkMinutes             = 25
+	testShortBreakMinutes       = 5
+	testLongBreakMinutes        = 15
 	testSessionsBeforeLongBreak = 4
 )
 

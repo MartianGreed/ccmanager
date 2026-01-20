@@ -25,12 +25,12 @@ type SessionEventMsg struct {
 
 // GameStateMsg contains updated game state
 type GameStateMsg struct {
-	APM             int
-	StreakMult      float64
-	StreakCount     int
-	Score           int
-	PomodoroState   game.PomodoroState
-	PomodoroRemain  time.Duration
+	APM            int
+	StreakMult     float64
+	StreakCount    int
+	Score          int
+	PomodoroState  game.PomodoroState
+	PomodoroRemain time.Duration
 }
 
 // FocusSessionMsg requests focusing a session

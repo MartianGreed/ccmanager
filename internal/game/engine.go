@@ -6,21 +6,21 @@ import (
 )
 
 type EngineConfig struct {
-	APMWindowSeconds           int
-	StreakTimeoutSeconds       int
-	StreakMultiplierCap        float64
-	PomodoroWorkMinutes        int
-	PomodoroShortBreakMinutes  int
-	PomodoroLongBreakMinutes   int
-	PomodorosBeforeLongBreak   int
-	PomodoroMultiplier         float64
-	FocusBonusMinutes          int
-	FocusBonusMultiplier       float64
-	PointsAction               int
-	PointsTaskComplete         int
-	PointsUrgentHandled        int
-	PointsPomodoroComplete     int
-	DoubleTapThresholdMs       int
+	APMWindowSeconds          int
+	StreakTimeoutSeconds      int
+	StreakMultiplierCap       float64
+	PomodoroWorkMinutes       int
+	PomodoroShortBreakMinutes int
+	PomodoroLongBreakMinutes  int
+	PomodorosBeforeLongBreak  int
+	PomodoroMultiplier        float64
+	FocusBonusMinutes         int
+	FocusBonusMultiplier      float64
+	PointsAction              int
+	PointsTaskComplete        int
+	PointsUrgentHandled       int
+	PointsPomodoroComplete    int
+	DoubleTapThresholdMs      int
 }
 
 func DefaultEngineConfig() EngineConfig {

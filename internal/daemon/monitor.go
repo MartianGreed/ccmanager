@@ -9,6 +9,7 @@ import (
 
 	"github.com/valentindosimont/ccmanager/internal/claude"
 	"github.com/valentindosimont/ccmanager/internal/tmux"
+	"github.com/valentindosimont/ccmanager/internal/usage"
 )
 
 // SessionState represents the monitored state of a Claude session
@@ -23,6 +24,8 @@ type SessionState struct {
 	Created      time.Time
 	Attached     bool
 	ClaudePane   *tmux.Pane
+	WorkingDir   string
+	Usage        *usage.SessionUsage
 }
 
 // Event represents a session event
@@ -54,10 +57,12 @@ type Monitor struct {
 	mu       sync.RWMutex
 	sessions map[string]*SessionState
 
-	pollInterval time.Duration
-	stopCh       chan struct{}
-	eventCh      chan Event
-	debug        bool
+	pollInterval  time.Duration
+	stopCh        chan struct{}
+	eventCh       chan Event
+	debug         bool
+	usageWatcher  *usage.Watcher
+	usagePollTick int
 }
 
 // NewMonitor creates a new session monitor
@@ -70,6 +75,7 @@ func NewMonitor(pollInterval time.Duration) *Monitor {
 		stopCh:       make(chan struct{}),
 		eventCh:      make(chan Event, 100),
 		debug:        os.Getenv("CCMANAGER_DEBUG") == "1",
+		usageWatcher: usage.NewWatcher(5 * time.Second),
 	}
 }
 
@@ -91,12 +97,14 @@ func (m *Monitor) Events() <-chan Event {
 
 // Start starts the monitor polling loop
 func (m *Monitor) Start() {
+	m.usageWatcher.Start()
 	go m.pollLoop()
 }
 
 // Stop stops the monitor
 func (m *Monitor) Stop() {
 	close(m.stopCh)
+	m.usageWatcher.Stop()
 }
 
 // Sessions returns all currently known sessions
@@ -134,7 +142,37 @@ func (m *Monitor) pollLoop() {
 			return
 		case <-ticker.C:
 			m.poll()
+			// Update usage every 5 poll cycles (roughly every 2.5s with 500ms poll)
+			m.usagePollTick++
+			if m.usagePollTick >= 5 {
+				m.usagePollTick = 0
+				m.updateUsage()
+			}
 		}
+	}
+}
+
+func (m *Monitor) updateUsage() {
+	m.mu.RLock()
+	sessions := make(map[string]string)
+	for name, sess := range m.sessions {
+		if sess.WorkingDir != "" {
+			sessions[name] = sess.WorkingDir
+		}
+	}
+	m.mu.RUnlock()
+
+	for name, workingDir := range sessions {
+		sessionUsage, err := usage.GetMostRecentSession(workingDir)
+		if err != nil || sessionUsage == nil {
+			continue
+		}
+
+		m.mu.Lock()
+		if sess, ok := m.sessions[name]; ok {
+			sess.Usage = sessionUsage
+		}
+		m.mu.Unlock()
 	}
 }
 
@@ -220,6 +258,9 @@ func (m *Monitor) poll() {
 			state := m.detector.DetectState(content, "", time.Time{})
 			info := m.detector.ParseInfo(content)
 
+			// Get working directory for usage tracking
+			workingDir, _ := m.tmux.GetSessionPath(ts.Name)
+
 			m.sessions[ts.Name] = &SessionState{
 				Name:         ts.Name,
 				State:        state,
@@ -231,6 +272,12 @@ func (m *Monitor) poll() {
 				Created:      ts.Created,
 				Attached:     ts.Attached,
 				ClaudePane:   claudePane,
+				WorkingDir:   workingDir,
+			}
+
+			// Start watching for usage updates
+			if workingDir != "" {
+				m.usageWatcher.WatchSession(ts.Name, workingDir)
 			}
 			m.mu.Unlock()
 
@@ -289,6 +336,7 @@ func (m *Monitor) poll() {
 	m.mu.Lock()
 	for name := range m.sessions {
 		if !seen[name] {
+			m.usageWatcher.UnwatchSession(name)
 			delete(m.sessions, name)
 			m.eventCh <- Event{
 				Type:    EventSessionClosed,

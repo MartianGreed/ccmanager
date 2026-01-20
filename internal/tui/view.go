@@ -338,13 +338,19 @@ func (m *Model) viewSessionList(width, height int) string {
 		elapsed := time.Since(sess.Created)
 		elapsedStr := formatDuration(elapsed)
 
+		// Format cost if available
+		costStr := ""
+		if sess.Usage != nil && sess.Usage.EstimatedCost > 0 {
+			costStr = fmt.Sprintf("$%.2f", sess.Usage.EstimatedCost)
+		}
+
 		// Calculate available width for session name
-		nameWidth := width - 25 // cursor(2) + group(4) + icon(2) + state(8) + elapsed(6) + padding
+		nameWidth := width - 32 // cursor(2) + group(4) + icon(2) + state(8) + elapsed(6) + cost(7) + padding
 		if nameWidth < 8 {
 			nameWidth = 8
 		}
 
-		line := fmt.Sprintf("%s%-*s %s %s%-8s %5s",
+		line := fmt.Sprintf("%s%-*s %s %s%-8s %5s %6s",
 			cursor,
 			nameWidth,
 			truncate(sess.Name, nameWidth),
@@ -352,6 +358,7 @@ func (m *Model) viewSessionList(width, height int) string {
 			stateIcon,
 			stateStr,
 			elapsedStr,
+			costStr,
 		)
 
 		if i == m.selected {
@@ -422,6 +429,12 @@ func (m *Model) viewPreview(width, height int) string {
 	}
 	if sess.Tokens > 0 {
 		statusLine += fmt.Sprintf(" · ↓ %s tokens", formatTokens(sess.Tokens))
+	}
+
+	// Add usage info if available
+	if sess.Usage != nil {
+		usageStr := formatUsageCompact(sess.Usage.TotalUsage.TotalInput(), sess.Usage.TotalUsage.OutputTokens, sess.Usage.EstimatedCost)
+		statusLine += " · " + usageStr
 	}
 	lines = append(lines, statStyle.Render(statusLine))
 
@@ -821,6 +834,22 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func formatUsageCompact(inputTokens, outputTokens int64, cost float64) string {
+	inStr := formatTokensLarge(inputTokens)
+	outStr := formatTokensLarge(outputTokens)
+	return fmt.Sprintf("↓%s ↑%s $%.2f", inStr, outStr, cost)
+}
+
+func formatTokensLarge(n int64) string {
+	if n < 1000 {
+		return fmt.Sprintf("%d", n)
+	}
+	if n < 1_000_000 {
+		return fmt.Sprintf("%.1fk", float64(n)/1000)
+	}
+	return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
 }
 
 func stripANSI(s string) string {

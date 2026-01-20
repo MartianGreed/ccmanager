@@ -11,11 +11,11 @@ import (
 type SessionState int
 
 const (
-	StateUnknown SessionState = iota
-	StateIdle                 // Prompt visible, waiting for input
-	StateActive               // User recently typed
-	StateThinking             // Claude is thinking
-	StateUrgent               // Needs immediate input
+	StateUnknown  SessionState = iota
+	StateIdle                  // Prompt visible, waiting for input
+	StateActive                // User recently typed
+	StateThinking              // Claude is thinking
+	StateUrgent                // Needs immediate input
 )
 
 func (s SessionState) String() string {
