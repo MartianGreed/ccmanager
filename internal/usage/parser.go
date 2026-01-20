@@ -163,7 +163,6 @@ func FindProjectDir(workingDir string) (string, error) {
 
 	// Claude Code uses path encoding: /Users/foo/bar -> -Users-foo-bar
 	encodedPath := strings.ReplaceAll(workingDir, "/", "-")
-	encodedPath = strings.TrimPrefix(encodedPath, "-")
 
 	projectDir := filepath.Join(claudeProjectsDir, encodedPath)
 	if _, err := os.Stat(projectDir); err != nil {
@@ -190,4 +189,62 @@ func SumUsageFromDir(projectDir string) (*TokenUsage, error) {
 	}
 
 	return total, nil
+}
+
+// FindActiveSessionID returns the session ID of the most recently modified JSONL file
+func FindActiveSessionID(workingDir string) (string, error) {
+	projectDir, err := FindProjectDir(workingDir)
+	if err != nil {
+		return "", err
+	}
+
+	files, err := FindSessionFiles(projectDir)
+	if err != nil {
+		return "", err
+	}
+
+	var mostRecent string
+	var mostRecentTime time.Time
+	for _, f := range files {
+		info, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(mostRecentTime) {
+			mostRecentTime = info.ModTime()
+			mostRecent = f
+		}
+	}
+
+	if mostRecent == "" {
+		return "", nil
+	}
+
+	// Extract session ID from filename (e.g., "abc123.jsonl" -> "abc123")
+	return strings.TrimSuffix(filepath.Base(mostRecent), ".jsonl"), nil
+}
+
+// GetSessionByID returns usage for a specific Claude session ID
+func GetSessionByID(workingDir, sessionID string) (*SessionUsage, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+
+	projectDir, err := FindProjectDir(workingDir)
+	if err != nil {
+		return nil, err
+	}
+
+	sessionFile := filepath.Join(projectDir, sessionID+".jsonl")
+	if _, err := os.Stat(sessionFile); err != nil {
+		return nil, nil // File doesn't exist, return nil without error
+	}
+
+	usage, err := ParseSessionFile(sessionFile)
+	if err != nil {
+		return nil, err
+	}
+
+	usage.EstimatedCost = CalculateCost(usage.TotalUsage, usage.Model)
+	return usage, nil
 }

@@ -14,18 +14,19 @@ import (
 
 // SessionState represents the monitored state of a Claude session
 type SessionState struct {
-	Name         string
-	State        claude.SessionState
-	LastContent  string
-	LastCapture  time.Time
-	Tokens       int
-	ThinkingTime time.Duration
-	LastLine     string
-	Created      time.Time
-	Attached     bool
-	ClaudePane   *tmux.Pane
-	WorkingDir   string
-	Usage        *usage.SessionUsage
+	Name            string
+	State           claude.SessionState
+	LastContent     string
+	LastCapture     time.Time
+	Tokens          int
+	ThinkingTime    time.Duration
+	LastLine        string
+	Created         time.Time
+	Attached        bool
+	ClaudePane      *tmux.Pane
+	WorkingDir      string
+	Usage           *usage.SessionUsage
+	ClaudeSessionID string // Locked Claude session UUID for usage tracking
 }
 
 // Event represents a session event
@@ -154,16 +155,24 @@ func (m *Monitor) pollLoop() {
 
 func (m *Monitor) updateUsage() {
 	m.mu.RLock()
-	sessions := make(map[string]string)
+	type sessionInfo struct {
+		workingDir      string
+		claudeSessionID string
+	}
+	sessions := make(map[string]sessionInfo)
 	for name, sess := range m.sessions {
 		if sess.WorkingDir != "" {
-			sessions[name] = sess.WorkingDir
+			sessions[name] = sessionInfo{
+				workingDir:      sess.WorkingDir,
+				claudeSessionID: sess.ClaudeSessionID,
+			}
 		}
 	}
 	m.mu.RUnlock()
 
-	for name, workingDir := range sessions {
-		sessionUsage, err := usage.GetMostRecentSession(workingDir)
+	for name, info := range sessions {
+		// Use the locked session ID instead of finding most recent
+		sessionUsage, err := usage.GetSessionByID(info.workingDir, info.claudeSessionID)
 		if err != nil || sessionUsage == nil {
 			continue
 		}
@@ -261,23 +270,35 @@ func (m *Monitor) poll() {
 			// Get working directory for usage tracking
 			workingDir, _ := m.tmux.GetSessionPath(ts.Name)
 
-			m.sessions[ts.Name] = &SessionState{
-				Name:         ts.Name,
-				State:        state,
-				LastContent:  content,
-				LastCapture:  now,
-				Tokens:       info.Tokens,
-				ThinkingTime: info.ThinkingTime,
-				LastLine:     info.LastLine,
-				Created:      ts.Created,
-				Attached:     ts.Attached,
-				ClaudePane:   claudePane,
-				WorkingDir:   workingDir,
+			// Find and lock the Claude session ID for this tmux session
+			var claudeSessionID string
+			var initialUsage *usage.SessionUsage
+			if workingDir != "" {
+				claudeSessionID, _ = usage.FindActiveSessionID(workingDir)
+				if claudeSessionID != "" {
+					initialUsage, _ = usage.GetSessionByID(workingDir, claudeSessionID)
+				}
 			}
 
-			// Start watching for usage updates
+			m.sessions[ts.Name] = &SessionState{
+				Name:            ts.Name,
+				State:           state,
+				LastContent:     content,
+				LastCapture:     now,
+				Tokens:          info.Tokens,
+				ThinkingTime:    info.ThinkingTime,
+				LastLine:        info.LastLine,
+				Created:         ts.Created,
+				Attached:        ts.Attached,
+				ClaudePane:      claudePane,
+				WorkingDir:      workingDir,
+				Usage:           initialUsage,
+				ClaudeSessionID: claudeSessionID,
+			}
+
+			// Start watching for usage updates with the locked session ID
 			if workingDir != "" {
-				m.usageWatcher.WatchSession(ts.Name, workingDir)
+				m.usageWatcher.WatchSession(ts.Name, workingDir, claudeSessionID)
 			}
 			m.mu.Unlock()
 
