@@ -78,6 +78,10 @@ func (m *Model) View() string {
 		return m.viewActivityOverlay()
 	}
 
+	if m.showUsage {
+		return m.viewUsageOverlay()
+	}
+
 	// Calculate layout dimensions
 	innerWidth := m.width - 2 // account for outer border
 
@@ -102,7 +106,9 @@ func (m *Model) View() string {
 	if promptHeight < promptLines+2 {
 		promptHeight = promptLines + 2
 	}
-	mainHeight := m.height - headerHeight - groupsHeight - promptHeight - helpBarHeight - borderOverhead - 2
+	// Frame interior is m.height - 2; content must fit within it
+	// content = header(1) + groups(1) + helpBar(1) + 4 dividers + mainHeight + promptHeight
+	mainHeight := m.height - headerHeight - groupsHeight - promptHeight - helpBarHeight - borderOverhead - 4
 	if mainHeight < 5 {
 		mainHeight = 5
 	}
@@ -153,13 +159,16 @@ func (m *Model) viewHeader(width int) string {
 
 	apm := statStyle.Render(fmt.Sprintf("APM: %d", m.apm))
 
-	var usageStr string
-	if m.selected >= 0 && m.selected < len(m.sessions) {
-		if sess := m.sessions[m.selected]; sess != nil && sess.Usage != nil {
-			usageStr = formatUsageCompact(sess.Usage.TotalUsage.TotalInput(),
-				sess.Usage.TotalUsage.OutputTokens, sess.Usage.EstimatedCost)
+	var totalInput, totalOutput int64
+	var totalCost float64
+	for _, sess := range m.sessions {
+		if sess != nil && sess.Usage != nil {
+			totalInput += sess.Usage.TotalUsage.TotalInput()
+			totalOutput += sess.Usage.TotalUsage.OutputTokens
+			totalCost += sess.Usage.EstimatedCost
 		}
 	}
+	usageStr := formatUsageCompact(totalInput, totalOutput, totalCost)
 
 	streakStr := fmt.Sprintf("STREAK: x%.1f", m.streakMult)
 	streak := statStyle.Render(streakStr)
@@ -665,6 +674,7 @@ GAME
   p           Start/pause pomodoro
   P           Stop pomodoro
   s           Show statistics
+  u           Show usage summary
 
 GENERAL
   ?           Toggle help
@@ -696,6 +706,55 @@ Today
 		BorderForeground(colorPrimary).
 		Padding(1, 2).
 		Render(stats)
+}
+
+func (m *Model) viewUsageOverlay() string {
+	var lines []string
+
+	title := titleStyle.Render("GLOBAL USAGE SUMMARY")
+	lines = append(lines, title)
+	lines = append(lines, "")
+
+	// Current sessions usage
+	var currentInput, currentOutput int64
+	var currentCost float64
+	for _, sess := range m.sessions {
+		if sess != nil && sess.Usage != nil {
+			currentInput += sess.Usage.TotalUsage.TotalInput()
+			currentOutput += sess.Usage.TotalUsage.OutputTokens
+			currentCost += sess.Usage.EstimatedCost
+		}
+	}
+
+	lines = append(lines, sectionHeaderStyle.Render("Active Sessions"))
+	lines = append(lines, fmt.Sprintf("  Sessions:    %d", len(m.sessions)))
+	lines = append(lines, fmt.Sprintf("  Input:       %s tokens", formatTokensLarge(currentInput)))
+	lines = append(lines, fmt.Sprintf("  Output:      %s tokens", formatTokensLarge(currentOutput)))
+	lines = append(lines, fmt.Sprintf("  Est. Cost:   $%.2f", currentCost))
+	lines = append(lines, "")
+
+	// Global historical usage
+	lines = append(lines, sectionHeaderStyle.Render("All-Time (Local JSONL)"))
+	if m.globalUsage != nil {
+		lines = append(lines, fmt.Sprintf("  Projects:    %d", m.globalUsage.ProjectCount))
+		lines = append(lines, fmt.Sprintf("  Sessions:    %d", m.globalUsage.SessionCount))
+		lines = append(lines, fmt.Sprintf("  Input:       %s tokens", formatTokensLarge(m.globalUsage.TotalUsage.TotalInput())))
+		lines = append(lines, fmt.Sprintf("  Output:      %s tokens", formatTokensLarge(m.globalUsage.TotalUsage.OutputTokens)))
+		lines = append(lines, fmt.Sprintf("  Est. Cost:   $%.2f", m.globalUsage.EstimatedCost))
+	} else {
+		lines = append(lines, mutedStyle.Render("  Loading..."))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, helpStyle.Render("Press any key to close"))
+
+	content := strings.Join(lines, "\n")
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorPrimary).
+		Padding(1, 2).
+		Render(content)
 }
 
 func (m *Model) viewInputOverlay() string {

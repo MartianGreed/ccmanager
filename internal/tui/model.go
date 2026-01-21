@@ -19,6 +19,7 @@ import (
 	"github.com/valentindosimont/ccmanager/internal/store"
 	"github.com/valentindosimont/ccmanager/internal/tmux"
 	"github.com/valentindosimont/ccmanager/internal/tui/messages"
+	"github.com/valentindosimont/ccmanager/internal/usage"
 	"github.com/valentindosimont/ccmanager/internal/workspace"
 )
 
@@ -60,6 +61,10 @@ type Model struct {
 
 	// Activity overlay
 	showActivity bool
+
+	// Usage overlay
+	showUsage   bool
+	globalUsage *usage.GlobalUsage
 
 	// Game state (cached for display)
 	apm            int
@@ -524,10 +529,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	// Handle overlays first
-	if m.showHelp || m.showStats || m.showActivity {
+	if m.showHelp || m.showStats || m.showActivity || m.showUsage {
 		m.showHelp = false
 		m.showStats = false
 		m.showActivity = false
+		m.showUsage = false
 		return nil
 	}
 
@@ -562,6 +568,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 
 	case "s":
 		m.showStats = true
+
+	case "u":
+		m.showUsage = true
+		go func() {
+			global, _ := usage.GetGlobalUsage()
+			m.globalUsage = global
+		}()
 
 	case "up", "k":
 		if len(m.sessions) > 0 {

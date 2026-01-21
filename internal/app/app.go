@@ -78,7 +78,7 @@ func New(cfg Config, fileCfg *config.Config) (*App, error) {
 	}
 
 	// Initialize monitor
-	monitor := daemon.NewMonitor(cfg.PollInterval)
+	monitor := daemon.NewMonitor(cfg.PollInterval, st)
 
 	// Initialize game engine
 	engine := game.NewEngine(cfg.GameConfig)
