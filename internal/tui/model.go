@@ -44,6 +44,7 @@ type Model struct {
 
 	// Input mode
 	inputMode  bool
+	renameMode bool
 	inputField textinput.Model
 
 	// Path picker mode
@@ -109,6 +110,9 @@ type Model struct {
 
 	// Pending urgent session to switch to after prompt sent
 	pendingUrgent string
+
+	// Workspace repo cache (session name → source repo basename)
+	workspaceRepos map[string]string
 }
 
 // ActivityEntry represents a log entry
@@ -149,6 +153,7 @@ func New(monitor *daemon.Monitor, engine *game.Engine, store *store.Store, cfg *
 		previewHashes:    make(map[string]uint64),
 		previewScrollPos: make(map[string]int),
 		autoScroll:       make(map[string]bool),
+		workspaceRepos:   make(map[string]string),
 	}
 
 	engine.Pomodoro().OnComplete(func() {
@@ -191,13 +196,15 @@ func (m *Model) listenForMessages() tea.Cmd {
 
 func (m *Model) capturePreviewCmd(sessionName string, pane *tmux.Pane) tea.Cmd {
 	return func() tea.Msg {
-		var content string
-		var err error
-		if pane != nil {
-			content, err = m.tmux.CapturePane(sessionName, pane.WindowIndex, pane.PaneIndex)
-		} else {
-			content, err = m.tmux.CapturePaneDefault(sessionName)
+		if pane == nil {
+			return messages.PreviewCaptureMsg{
+				SessionName: sessionName,
+				Content:     "",
+				Hash:        0,
+				Err:         nil,
+			}
 		}
+		content, err := m.tmux.CapturePane(sessionName, pane.WindowIndex, pane.PaneIndex)
 		hash := fnv.New64a()
 		hash.Write([]byte(content))
 		return messages.PreviewCaptureMsg{
@@ -357,6 +364,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.lastError = fmt.Errorf("workspace creation failed: %w", err)
 							m.addActivity("", "Workspace creation failed: %v", err)
 						} else {
+							m.workspaceRepos[name] = filepath.Base(path)
 							if m.store != nil {
 								_ = m.store.SaveSessionWorkspace(name, wsPath, path)
 							}
@@ -404,6 +412,49 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.inputMode = false
 				m.inputField.Blur()
 				m.selectedPath = ""
+				return m, tea.Batch(cmds...)
+			}
+			var cmd tea.Cmd
+			m.inputField, cmd = m.inputField.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
+	}
+
+	// Handle rename mode
+	if m.renameMode {
+		if msg, ok := msg.(tea.KeyMsg); ok {
+			switch msg.String() {
+			case "enter":
+				newName := m.inputField.Value()
+				if newName != "" && m.selected < len(m.sessions) {
+					oldName := m.sessions[m.selected].Name
+					if newName != oldName {
+						if err := m.tmux.RenameSession(oldName, newName); err != nil {
+							m.lastError = fmt.Errorf("failed to rename session: %w", err)
+							m.addActivity(oldName, "Rename failed: %v", err)
+						} else {
+							m.addActivity(newName, "Renamed from %s", oldName)
+							groups := m.engine.ControlGroups().GroupsForSession(oldName)
+							for _, groupNum := range groups {
+								m.engine.ControlGroups().Assign(groupNum, newName)
+								if m.store != nil {
+									_ = m.store.SetControlGroup(groupNum, newName)
+								}
+							}
+							if m.focused == oldName {
+								m.focused = newName
+							}
+							m.sessions = m.monitor.Sessions()
+						}
+					}
+				}
+				m.renameMode = false
+				m.inputField.Blur()
+				return m, tea.Batch(cmds...)
+			case "esc":
+				m.renameMode = false
+				m.inputField.Blur()
 				return m, tea.Batch(cmds...)
 			}
 			var cmd tea.Cmd
@@ -742,9 +793,15 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 					editor = "nvim"
 				}
 				_ = m.tmux.NewWindow(session.Name, "editor", path, editor+" .")
-				_ = m.tmux.SwitchClient(session.Name)
 				m.addActivity(session.Name, "Opened %s", editor)
 			}
+		}
+
+	case "r":
+		if m.selected < len(m.sessions) {
+			m.renameMode = true
+			m.inputField.SetValue(m.sessions[m.selected].Name)
+			m.inputField.Focus()
 		}
 	}
 
@@ -868,6 +925,9 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 		m.sessions = m.monitor.Sessions()
 		if m.store != nil {
 			_ = m.store.CreateSession(event.Session)
+			if _, sourceRepo, err := m.store.GetSessionWorkspace(event.Session); err == nil && sourceRepo != "" {
+				m.workspaceRepos[event.Session] = filepath.Base(sourceRepo)
+			}
 		}
 
 	case daemon.EventSessionClosed:
@@ -875,6 +935,7 @@ func (m *Model) handleSessionEvent(event daemon.Event) {
 		m.sessions = m.monitor.Sessions()
 		m.engine.ControlGroups().RemoveSession(event.Session)
 		m.engine.RemoveSession(event.Session)
+		delete(m.workspaceRepos, event.Session)
 		if m.selected >= len(m.sessions) {
 			m.selected = max(0, len(m.sessions)-1)
 		}

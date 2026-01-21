@@ -52,6 +52,9 @@ type Detector struct {
 	thinkingPattern      *regexp.Regexp
 	ansiPattern          *regexp.Regexp
 	modePattern          *regexp.Regexp
+	tokenPattern    *regexp.Regexp
+	thinkingPattern *regexp.Regexp
+	ansiPattern     *regexp.Regexp
 }
 
 // NewDetector creates a new Claude state detector

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,7 +63,7 @@ func (m *Model) View() string {
 		return m.viewPathPicker()
 	}
 
-	if m.inputMode {
+	if m.inputMode || m.renameMode {
 		return m.viewInputOverlay()
 	}
 
@@ -105,6 +106,13 @@ func (m *Model) View() string {
 	promptHeight := promptLines + max(0, activityHeight-promptLines)
 	if promptHeight < promptLines+2 {
 		promptHeight = promptLines + 2
+	}
+	// Frame interior is m.height - 2; content must fit within it
+	// content = header(1) + groups(1) + helpBar(1) + 4 dividers + mainHeight + promptHeight
+	mainHeight := m.height - headerHeight - groupsHeight - promptHeight - helpBarHeight - borderOverhead - 4
+	maxPromptHeight := m.height / 2
+	if promptHeight > maxPromptHeight {
+		promptHeight = maxPromptHeight
 	}
 	// Frame interior is m.height - 2; content must fit within it
 	// content = header(1) + groups(1) + helpBar(1) + 4 dividers + mainHeight + promptHeight
@@ -368,10 +376,15 @@ func (m *Model) viewSessionList(width, height int) string {
 			nameWidth = 8
 		}
 
+		displayName := sess.Name
+		if repoName, ok := m.workspaceRepos[sess.Name]; ok {
+			displayName = fmt.Sprintf("%s (%s)", sess.Name, repoName)
+		}
+
 		line := fmt.Sprintf("%s%-*s %s %s%-8s %5s %6s",
 			cursor,
 			nameWidth,
-			truncate(sess.Name, nameWidth),
+			truncate(displayName, nameWidth),
 			groupStr,
 			stateIcon,
 			stateStr,
@@ -648,6 +661,7 @@ NAVIGATION
 
 SESSIONS
   n           Create new session
+  r           Rename selected session
   dd          Delete selected session
   e           Open editor in session dir
 
@@ -764,9 +778,20 @@ func (m *Model) viewInputOverlay() string {
 		Padding(1, 2).
 		Width(50)
 
-	title := titleStyle.Render("New Session Name:")
+	var title, help string
+	if m.renameMode {
+		title = titleStyle.Render("Rename Session:")
+		help = helpStyle.Render("[Enter] Rename  [Esc] Cancel")
+	} else {
+		if m.workspaceMode && m.selectedPath != "" {
+			repoName := filepath.Base(m.selectedPath)
+			title = titleStyle.Render(fmt.Sprintf("New Session for %s:", repoName))
+		} else {
+			title = titleStyle.Render("New Session Name:")
+		}
+		help = helpStyle.Render("[Enter] Create  [Esc] Cancel")
+	}
 	input := m.inputField.View()
-	help := helpStyle.Render("[Enter] Create  [Esc] Cancel")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
