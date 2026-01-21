@@ -42,6 +42,8 @@ internal/
 1. Run tests: `make test`
 2. Run linter: `make lint`
 3. Ensure build passes: `make build`
+4. Use [Conventional Commits](https://conventionalcommits.org/en/v1.0.0/) format (e.g., `fix:`, `feat:`, `refactor:`)
+5. Automatically commit work once task is complete
 
 ## Testing
 

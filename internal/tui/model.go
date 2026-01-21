@@ -411,6 +411,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle prompt mode
 	if m.promptMode {
 		if msg, ok := msg.(tea.KeyMsg); ok {
+			m.engine.RecordAction(game.ActionKeypress)
 			switch msg.String() {
 			case "enter":
 				text := m.promptField.Value()

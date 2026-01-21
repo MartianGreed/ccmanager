@@ -52,33 +52,43 @@ func (w *Watcher) Stop() {
 }
 
 // WatchSession adds a session to the watch list
-func (w *Watcher) WatchSession(sessionName, workingDir string) {
+// If sessionID is provided, watch that specific session file; otherwise find most recent
+func (w *Watcher) WatchSession(sessionName, workingDir, sessionID string) {
 	projectDir, err := FindProjectDir(workingDir)
 	if err != nil {
 		return
 	}
 
-	// Find the most recent JSONL file in the project dir
-	files, err := FindSessionFiles(projectDir)
-	if err != nil || len(files) == 0 {
-		return
+	var sessionFile string
+
+	if sessionID != "" {
+		// Use specific session file
+		sessionFile = filepath.Join(projectDir, sessionID+".jsonl")
+		if _, err := os.Stat(sessionFile); err != nil {
+			return // File doesn't exist
+		}
+	} else {
+		// Find the most recent JSONL file in the project dir
+		files, err := FindSessionFiles(projectDir)
+		if err != nil || len(files) == 0 {
+			return
+		}
+
+		// Get the most recently modified file
+		var mostRecentTime time.Time
+		for _, f := range files {
+			info, err := os.Stat(f)
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(mostRecentTime) {
+				mostRecentTime = info.ModTime()
+				sessionFile = f
+			}
+		}
 	}
 
-	// Get the most recently modified file
-	var mostRecent string
-	var mostRecentTime time.Time
-	for _, f := range files {
-		info, err := os.Stat(f)
-		if err != nil {
-			continue
-		}
-		if info.ModTime().After(mostRecentTime) {
-			mostRecentTime = info.ModTime()
-			mostRecent = f
-		}
-	}
-
-	if mostRecent == "" {
+	if sessionFile == "" {
 		return
 	}
 
@@ -87,7 +97,7 @@ func (w *Watcher) WatchSession(sessionName, workingDir string) {
 
 	if _, exists := w.sessions[sessionName]; !exists {
 		w.sessions[sessionName] = &sessionWatch{
-			sessionFile: mostRecent,
+			sessionFile: sessionFile,
 		}
 	}
 }

@@ -82,6 +82,7 @@ func NewDetector() *Detector {
 			regexp.MustCompile(`(?m)claude>\s*$`),
 			regexp.MustCompile(`↵ send`),
 			regexp.MustCompile(`⏵⏵`),
+			regexp.MustCompile(`▐▛███▜▌`),
 		},
 		promptActivePatterns: []*regexp.Regexp{},
 		claudePatterns: []*regexp.Regexp{

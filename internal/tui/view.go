@@ -58,10 +58,6 @@ func (m *Model) View() string {
 		return "\n  Close all tmux sessions?\n\n  [y] Yes, kill sessions  [n] No, keep running  [c] Cancel\n"
 	}
 
-	if m.showNotification {
-		return m.viewNotification()
-	}
-
 	if m.pathPickerMode {
 		return m.viewPathPicker()
 	}
@@ -141,13 +137,29 @@ func (m *Model) View() string {
 		Width(innerWidth).
 		Height(m.height - 2)
 
-	return frame.Render(content)
+	view := frame.Render(content)
+
+	// Overlay notification popup if active
+	if m.showNotification {
+		popup := m.viewNotification()
+		view = m.overlayPopup(view, popup)
+	}
+
+	return view
 }
 
 func (m *Model) viewHeader(width int) string {
 	title := titleStyle.Render("CCMANAGER")
 
 	apm := statStyle.Render(fmt.Sprintf("APM: %d", m.apm))
+
+	var usageStr string
+	if m.selected >= 0 && m.selected < len(m.sessions) {
+		if sess := m.sessions[m.selected]; sess != nil && sess.Usage != nil {
+			usageStr = formatUsageCompact(sess.Usage.TotalUsage.TotalInput(),
+				sess.Usage.TotalUsage.OutputTokens, sess.Usage.EstimatedCost)
+		}
+	}
 
 	streakStr := fmt.Sprintf("STREAK: x%.1f", m.streakMult)
 	streak := statStyle.Render(streakStr)
@@ -163,7 +175,13 @@ func (m *Model) viewHeader(width int) string {
 		pomodoro = lipgloss.NewStyle().Bold(true).Foreground(colorSuccess).Render(pomodoroStr)
 	}
 
-	stats := fmt.Sprintf("%s  │  %s  │  %s  │  %s", apm, streak, score, pomodoro)
+	// Build stats - usage first (if available), then others
+	var statParts []string
+	if usageStr != "" {
+		statParts = append(statParts, statStyle.Render(usageStr))
+	}
+	statParts = append(statParts, apm, streak, score, pomodoro)
+	stats := strings.Join(statParts, "  │  ")
 	statsWidth := lipgloss.Width(stats)
 	titleWidth := lipgloss.Width(title)
 
@@ -703,13 +721,24 @@ func (m *Model) viewInputOverlay() string {
 }
 
 func (m *Model) viewPathPicker() string {
+	var wsStatus string
+	if m.workspaceMode {
+		wsStatus = "[w] workspace: ON"
+	} else {
+		wsStatus = "[w] workspace: off"
+	}
+	help := helpStyle.Render(wsStatus + "  [Enter] select  [Esc] cancel")
+
+	listView := m.pathPickerList.View()
+	content := lipgloss.JoinVertical(lipgloss.Left, listView, "", help)
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorPrimary).
 		Padding(1, 2).
 		Width(m.width - 4).
 		Height(m.height - 4).
-		Render(m.pathPickerList.View())
+		Render(content)
 }
 
 func (m *Model) viewNotification() string {
@@ -726,6 +755,18 @@ func (m *Model) viewNotification() string {
 		BorderForeground(colorSuccess).
 		Padding(1, 2).
 		Render(notification)
+}
+
+func (m *Model) overlayPopup(background, popup string) string {
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		popup,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceForeground(lipgloss.AdaptiveColor{}),
+	)
 }
 
 // Helper functions

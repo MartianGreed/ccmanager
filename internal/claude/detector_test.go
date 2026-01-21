@@ -42,6 +42,7 @@ func TestDetectState(t *testing.T) {
 		{"urgent permission", "Permission requested for bash", StateUrgent},
 		{"waiting thinking", "✽ Thinking... (ctrl+c to cancel)", StateThinking},
 		{"idle prompt", "some output\n❯ ", StateIdle},
+		{"idle claude code logo", " ▐▛███▜▌   Claude Code v2.1.12\n▝▜█████▛▘  Opus 4.5", StateIdle},
 		{"active shortcuts hint", "? for shortcuts", StateActive},
 		{"active accept edits", "accept edits on (shift+tab to cycle)", StateActive},
 		{"active plan mode", "plan mode on (shift+tab to cycle)", StateActive},
