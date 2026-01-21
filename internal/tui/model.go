@@ -19,6 +19,7 @@ import (
 	"github.com/valentindosimont/ccmanager/internal/store"
 	"github.com/valentindosimont/ccmanager/internal/tmux"
 	"github.com/valentindosimont/ccmanager/internal/tui/messages"
+	"github.com/valentindosimont/ccmanager/internal/usage"
 	"github.com/valentindosimont/ccmanager/internal/workspace"
 )
 
@@ -60,6 +61,10 @@ type Model struct {
 
 	// Activity overlay
 	showActivity bool
+
+	// Usage overlay
+	showUsage   bool
+	globalUsage *usage.GlobalUsage
 
 	// Game state (cached for display)
 	apm            int
@@ -427,6 +432,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if text != "" && m.selected < len(m.sessions) {
 					session := m.sessions[m.selected]
+					if targetMode := m.config.UI.DefaultMode; targetMode != "" {
+						if m.switchToMode(session, targetMode) {
+							m.addActivity(session.Name, "Switched to %s mode", targetMode)
+						}
+					}
 					_ = m.tmux.SendKeysToPane(session.Name, session.ClaudePane, text)
 					m.addActivity(session.Name, "Sent: %s", text)
 					m.addToPromptHistory(text)
@@ -524,10 +534,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	// Handle overlays first
-	if m.showHelp || m.showStats || m.showActivity {
+	if m.showHelp || m.showStats || m.showActivity || m.showUsage {
 		m.showHelp = false
 		m.showStats = false
 		m.showActivity = false
+		m.showUsage = false
 		return nil
 	}
 
@@ -562,6 +573,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 
 	case "s":
 		m.showStats = true
+
+	case "u":
+		m.showUsage = true
+		go func() {
+			global, _ := usage.GetGlobalUsage()
+			m.globalUsage = global
+		}()
 
 	case "up", "k":
 		if len(m.sessions) > 0 {
@@ -1098,4 +1116,31 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (m *Model) switchToMode(session *daemon.SessionState, targetMode string) bool {
+	if targetMode == "" || session.State == claude.StateUrgent {
+		return false
+	}
+
+	content := m.previewCache[session.Name]
+	detector := claude.NewDetector()
+	currentMode := detector.DetectMode(content)
+
+	if strings.EqualFold(currentMode, targetMode) {
+		return false
+	}
+
+	const maxCycles = 3
+	for i := 0; i < maxCycles; i++ {
+		_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "BTab")
+		time.Sleep(50 * time.Millisecond)
+
+		newContent, _ := m.tmux.CapturePaneDefault(session.Name)
+		if strings.EqualFold(detector.DetectMode(newContent), targetMode) {
+			time.Sleep(50 * time.Millisecond)
+			return true
+		}
+	}
+	return false
 }

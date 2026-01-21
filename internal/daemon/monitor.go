@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/valentindosimont/ccmanager/internal/claude"
+	"github.com/valentindosimont/ccmanager/internal/store"
 	"github.com/valentindosimont/ccmanager/internal/tmux"
 	"github.com/valentindosimont/ccmanager/internal/usage"
 )
@@ -54,6 +55,7 @@ const (
 type Monitor struct {
 	tmux     *tmux.Client
 	detector *claude.Detector
+	store    *store.Store
 
 	mu       sync.RWMutex
 	sessions map[string]*SessionState
@@ -67,10 +69,11 @@ type Monitor struct {
 }
 
 // NewMonitor creates a new session monitor
-func NewMonitor(pollInterval time.Duration) *Monitor {
+func NewMonitor(pollInterval time.Duration, st *store.Store) *Monitor {
 	return &Monitor{
 		tmux:         tmux.NewClient(),
 		detector:     claude.NewDetector(),
+		store:        st,
 		sessions:     make(map[string]*SessionState),
 		pollInterval: pollInterval,
 		stopCh:       make(chan struct{}),
@@ -271,13 +274,22 @@ func (m *Monitor) poll() {
 			workingDir, _ := m.tmux.GetSessionPath(ts.Name)
 
 			// Find and lock the Claude session ID for this tmux session
+			// Try to load persisted ID first, so usage survives restarts
 			var claudeSessionID string
 			var initialUsage *usage.SessionUsage
-			if workingDir != "" {
+			if m.store != nil {
+				claudeSessionID, _ = m.store.GetClaudeSessionID(ts.Name)
+			}
+			if claudeSessionID == "" && workingDir != "" {
 				claudeSessionID, _ = usage.FindActiveSessionID(workingDir)
-				if claudeSessionID != "" {
-					initialUsage, _ = usage.GetSessionByID(workingDir, claudeSessionID)
+				// Persist it for next restart
+				if m.store != nil && claudeSessionID != "" {
+					_ = m.store.CreateSession(ts.Name)
+					_ = m.store.SetClaudeSessionID(ts.Name, claudeSessionID)
 				}
+			}
+			if claudeSessionID != "" && workingDir != "" {
+				initialUsage, _ = usage.GetSessionByID(workingDir, claudeSessionID)
 			}
 
 			m.sessions[ts.Name] = &SessionState{

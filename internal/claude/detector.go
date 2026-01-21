@@ -51,6 +51,7 @@ type Detector struct {
 	tokenPattern         *regexp.Regexp
 	thinkingPattern      *regexp.Regexp
 	ansiPattern          *regexp.Regexp
+	modePattern          *regexp.Regexp
 }
 
 // NewDetector creates a new Claude state detector
@@ -71,14 +72,19 @@ func NewDetector() *Detector {
 			regexp.MustCompile(`(?i)skip interview and plan`),
 		},
 		thinkingPatterns: []*regexp.Regexp{
-			regexp.MustCompile(`ing\.\.\. \(ctrl`),
+			regexp.MustCompile(`(?i)thinking\.{3}`),
+			regexp.MustCompile(`(?i)thinking…`),
+			regexp.MustCompile(`(?i)reasoning`),
 			regexp.MustCompile(`⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏`),
 			regexp.MustCompile(`Working\.\.\.`),
 			regexp.MustCompile(`Processing\.\.\.`),
+			regexp.MustCompile(`\(esc to cancel\)`),
+			regexp.MustCompile(`\(ctrl.* to interrupt\)`),
+			regexp.MustCompile(`thought for \d+`),
+			regexp.MustCompile(`thinking`),
 		},
 		idlePatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?m)❯\s*$`),
-			regexp.MustCompile(`(?m)>\s*$`),
 			regexp.MustCompile(`(?m)claude>\s*$`),
 			regexp.MustCompile(`↵ send`),
 			regexp.MustCompile(`⏵⏵`),
@@ -94,6 +100,7 @@ func NewDetector() *Detector {
 		tokenPattern:    regexp.MustCompile(`↓\s*([\d,.]+)k?\s*tokens?`),
 		thinkingPattern: regexp.MustCompile(`Thinking[^(]*\((\d+)m?\s*(\d+)?s?\)`),
 		ansiPattern:     regexp.MustCompile(`\x1b\[[0-9;]*m`),
+		modePattern:     regexp.MustCompile(`(?i)(plan|code|auto|accept[\s-]?edits?)\s+(?:mode\s+)?on\s+\(shift\+tab`),
 	}
 }
 
@@ -181,6 +188,19 @@ func (d *Detector) ParseInfo(content string) SessionInfo {
 	}
 
 	return info
+}
+
+// DetectMode detects the current Claude mode (plan, code, auto) from terminal output
+func (d *Detector) DetectMode(content string) string {
+	content = d.stripANSI(content)
+	if matches := d.modePattern.FindStringSubmatch(content); len(matches) >= 2 {
+		mode := strings.ToLower(matches[1])
+		if strings.Contains(mode, "accept") || strings.Contains(mode, "edit") {
+			return "edit"
+		}
+		return mode
+	}
+	return ""
 }
 
 func (d *Detector) stripANSI(s string) string {

@@ -41,6 +41,13 @@ func TestDetectState(t *testing.T) {
 		{"urgent yn", "Allow execution? [Y/n]", StateUrgent},
 		{"urgent permission", "Permission requested for bash", StateUrgent},
 		{"waiting thinking", "✽ Thinking... (ctrl+c to cancel)", StateThinking},
+		{"thinking lowercase", "thinking...", StateThinking},
+		{"thinking unicode ellipsis", "Thinking…", StateThinking},
+		{"reasoning variant", "Reasoning about the problem", StateThinking},
+		{"esc to cancel", "Working (esc to cancel)", StateThinking},
+		{"ctrl to interrupt", "Processing (ctrl+c to interrupt)", StateThinking},
+		{"spinner char", "⠋ Loading", StateThinking},
+		{"thought for time", "(ctrl+c to interrupt · thought for 5s)", StateThinking},
 		{"idle prompt", "some output\n❯ ", StateIdle},
 		{"idle claude code logo", " ▐▛███▜▌   Claude Code v2.1.12\n▝▜█████▛▘  Opus 4.5", StateIdle},
 		{"active shortcuts hint", "? for shortcuts", StateActive},
@@ -53,6 +60,32 @@ func TestDetectState(t *testing.T) {
 			got := d.DetectState(tt.content, "", time.Time{})
 			if got != tt.want {
 				t.Errorf("DetectState() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectMode(t *testing.T) {
+	d := NewDetector()
+
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{"plan mode", "plan mode on (shift+tab to cycle)", "plan"},
+		{"code mode", "code mode on (shift+tab to cycle)", "code"},
+		{"auto mode", "auto mode on (shift+tab to cycle)", "auto"},
+		{"accept edits", "accept edits on (shift+tab to cycle)", "edit"},
+		{"uppercase", "PLAN mode on (shift+tab to cycle)", "plan"},
+		{"no mode", "some content", ""},
+		{"partial match", "mode on (shift+tab", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := d.DetectMode(tt.content); got != tt.want {
+				t.Errorf("DetectMode() = %q, want %q", got, tt.want)
 			}
 		})
 	}

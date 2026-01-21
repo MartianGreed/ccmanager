@@ -248,3 +248,55 @@ func GetSessionByID(workingDir, sessionID string) (*SessionUsage, error) {
 	usage.EstimatedCost = CalculateCost(usage.TotalUsage, usage.Model)
 	return usage, nil
 }
+
+// GlobalUsage represents aggregated usage across all projects
+type GlobalUsage struct {
+	TotalUsage    TokenUsage
+	EstimatedCost float64
+	SessionCount  int
+	ProjectCount  int
+}
+
+// GetGlobalUsage scans all Claude projects and returns total historical usage
+func GetGlobalUsage() (*GlobalUsage, error) {
+	projectsDir, err := GetClaudeProjectsDir()
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	global := &GlobalUsage{}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		projectPath := filepath.Join(projectsDir, entry.Name())
+		files, err := FindSessionFiles(projectPath)
+		if err != nil {
+			continue
+		}
+
+		if len(files) > 0 {
+			global.ProjectCount++
+		}
+
+		for _, file := range files {
+			usage, err := ParseSessionFile(file)
+			if err != nil {
+				continue
+			}
+
+			global.TotalUsage.Add(usage.TotalUsage)
+			global.EstimatedCost += CalculateCost(usage.TotalUsage, usage.Model)
+			global.SessionCount++
+		}
+	}
+
+	return global, nil
+}

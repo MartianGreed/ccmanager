@@ -112,6 +112,12 @@ func (s *Store) migrate() error {
 
 	_, _ = s.db.Exec(string(schema3))
 
+	schema4, err := migrationsFS.ReadFile("migrations/004_claude_session_id.sql")
+	if err != nil {
+		return fmt.Errorf("read migration 004: %w", err)
+	}
+	_, _ = s.db.Exec(string(schema4))
+
 	return nil
 }
 
@@ -493,4 +499,28 @@ func (s *Store) DeleteSessionWorkspace(sessionName string) error {
 	}
 
 	return nil
+}
+
+func (s *Store) SetClaudeSessionID(sessionName, claudeSessionID string) error {
+	_, err := s.db.Exec(`
+		UPDATE sessions SET claude_session_id = ? WHERE name = ?
+	`, claudeSessionID, sessionName)
+	if err != nil {
+		return fmt.Errorf("set claude session id: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetClaudeSessionID(sessionName string) (string, error) {
+	var id sql.NullString
+	err := s.db.QueryRow(`
+		SELECT claude_session_id FROM sessions WHERE name = ?
+	`, sessionName).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get claude session id: %w", err)
+	}
+	return id.String, nil
 }

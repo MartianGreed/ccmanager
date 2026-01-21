@@ -46,6 +46,7 @@ type UIConfig struct {
 	NewlineSequence      string `yaml:"newline_sequence"`
 	SessionListWidthPct  int    `yaml:"session_list_width_pct"`
 	Editor               string `yaml:"editor"`
+	DefaultMode          string `yaml:"default_mode"`
 }
 
 type WorkspaceConfig struct {
