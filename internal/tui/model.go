@@ -266,6 +266,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.addActivity("", "Pomodoro complete! +%d points", msg.Points)
 		cmds = append(cmds, m.listenForMessages())
 
+	case messages.GlobalUsageMsg:
+		if global, ok := msg.Usage.(*usage.GlobalUsage); ok {
+			m.globalUsage = global
+		}
+		cmds = append(cmds, m.listenForMessages())
+
 	case messages.ErrorMsg:
 		m.lastError = msg.Err
 
@@ -629,7 +635,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		m.showUsage = true
 		go func() {
 			global, _ := usage.GetGlobalUsage()
-			m.globalUsage = global
+			m.msgChan <- messages.GlobalUsageMsg{Usage: global}
 		}()
 
 	case "up", "k":

@@ -52,9 +52,6 @@ type Detector struct {
 	thinkingPattern      *regexp.Regexp
 	ansiPattern          *regexp.Regexp
 	modePattern          *regexp.Regexp
-	tokenPattern    *regexp.Regexp
-	thinkingPattern *regexp.Regexp
-	ansiPattern     *regexp.Regexp
 }
 
 // NewDetector creates a new Claude state detector
@@ -88,6 +85,7 @@ func NewDetector() *Detector {
 		},
 		idlePatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?m)❯\s*$`),
+			regexp.MustCompile(`(?m)>\s*$`),
 			regexp.MustCompile(`(?m)claude>\s*$`),
 			regexp.MustCompile(`↵ send`),
 			regexp.MustCompile(`⏵⏵`),

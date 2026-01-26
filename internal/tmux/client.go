@@ -163,16 +163,7 @@ func (c *Client) RenameSession(oldName, newName string) error {
 
 // SendKeys sends keys to a tmux session
 func (c *Client) SendKeys(session, keys string) error {
-	// Send double Enter for multi-line content (3+ lines) to signal paste completion
-	enterCount := 1
-	if strings.Count(keys, "\n") >= 2 {
-		enterCount = 2
-	}
-	args := []string{"send-keys", "-t", session, keys}
-	for i := 0; i < enterCount; i++ {
-		args = append(args, "Enter")
-	}
-	cmd := exec.Command("tmux", args...)
+	cmd := exec.Command("tmux", "send-keys", "-t", session, keys, "Enter")
 	return cmd.Run()
 }
 
@@ -188,12 +179,6 @@ func (c *Client) SendKeysToPane(session string, pane *Pane, keys string) error {
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	// Send double Enter for multi-line content (3+ lines) to signal paste completion
-	args := []string{"send-keys", "-t", target, "Enter"}
-	if strings.Count(keys, "\n") >= 2 {
-		args = append(args, "Enter")
-	}
-	cmd = exec.Command("tmux", args...)
 	time.Sleep(10 * time.Millisecond)
 	// Send double Enter for multi-line content (3+ lines) to signal paste completion
 	args := []string{"send-keys", "-t", target, "Enter"}
