@@ -98,3 +98,8 @@ type PreviewCaptureMsg struct {
 	Hash        uint64
 	Err         error
 }
+
+// GlobalUsageMsg contains global usage data
+type GlobalUsageMsg struct {
+	Usage interface{}
+}

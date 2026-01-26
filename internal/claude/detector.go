@@ -85,6 +85,7 @@ func NewDetector() *Detector {
 		},
 		idlePatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?m)❯\s*$`),
+			regexp.MustCompile(`(?m)>\s*$`),
 			regexp.MustCompile(`(?m)claude>\s*$`),
 			regexp.MustCompile(`↵ send`),
 			regexp.MustCompile(`⏵⏵`),

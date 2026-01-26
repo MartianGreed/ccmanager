@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,7 +63,7 @@ func (m *Model) View() string {
 		return m.viewPathPicker()
 	}
 
-	if m.inputMode {
+	if m.inputMode || m.renameMode {
 		return m.viewInputOverlay()
 	}
 
@@ -76,10 +77,6 @@ func (m *Model) View() string {
 
 	if m.showActivity {
 		return m.viewActivityOverlay()
-	}
-
-	if m.showUsage {
-		return m.viewUsageOverlay()
 	}
 
 	// Calculate layout dimensions
@@ -105,6 +102,10 @@ func (m *Model) View() string {
 	promptHeight := promptLines + max(0, activityHeight-promptLines)
 	if promptHeight < promptLines+2 {
 		promptHeight = promptLines + 2
+	}
+	maxPromptHeight := m.height / 2
+	if promptHeight > maxPromptHeight {
+		promptHeight = maxPromptHeight
 	}
 	// Frame interior is m.height - 2; content must fit within it
 	// content = header(1) + groups(1) + helpBar(1) + 4 dividers + mainHeight + promptHeight
@@ -159,16 +160,13 @@ func (m *Model) viewHeader(width int) string {
 
 	apm := statStyle.Render(fmt.Sprintf("APM: %d", m.apm))
 
-	var totalInput, totalOutput int64
-	var totalCost float64
-	for _, sess := range m.sessions {
-		if sess != nil && sess.Usage != nil {
-			totalInput += sess.Usage.TotalUsage.TotalInput()
-			totalOutput += sess.Usage.TotalUsage.OutputTokens
-			totalCost += sess.Usage.EstimatedCost
+	var usageStr string
+	if m.selected >= 0 && m.selected < len(m.sessions) {
+		if sess := m.sessions[m.selected]; sess != nil && sess.Usage != nil {
+			usageStr = formatUsageCompact(sess.Usage.TotalUsage.TotalInput(),
+				sess.Usage.TotalUsage.OutputTokens, sess.Usage.EstimatedCost)
 		}
 	}
-	usageStr := formatUsageCompact(totalInput, totalOutput, totalCost)
 
 	streakStr := fmt.Sprintf("STREAK: x%.1f", m.streakMult)
 	streak := statStyle.Render(streakStr)
@@ -368,10 +366,15 @@ func (m *Model) viewSessionList(width, height int) string {
 			nameWidth = 8
 		}
 
+		displayName := sess.Name
+		if repoName, ok := m.workspaceRepos[sess.Name]; ok {
+			displayName = fmt.Sprintf("%s (%s)", sess.Name, repoName)
+		}
+
 		line := fmt.Sprintf("%s%-*s %s %s%-8s %5s %6s",
 			cursor,
 			nameWidth,
-			truncate(sess.Name, nameWidth),
+			truncate(displayName, nameWidth),
 			groupStr,
 			stateIcon,
 			stateStr,
@@ -648,6 +651,7 @@ NAVIGATION
 
 SESSIONS
   n           Create new session
+  r           Rename selected session
   dd          Delete selected session
   e           Open editor in session dir
 
@@ -674,7 +678,6 @@ GAME
   p           Start/pause pomodoro
   P           Stop pomodoro
   s           Show statistics
-  u           Show usage summary
 
 GENERAL
   ?           Toggle help
@@ -708,55 +711,6 @@ Today
 		Render(stats)
 }
 
-func (m *Model) viewUsageOverlay() string {
-	var lines []string
-
-	title := titleStyle.Render("GLOBAL USAGE SUMMARY")
-	lines = append(lines, title)
-	lines = append(lines, "")
-
-	// Current sessions usage
-	var currentInput, currentOutput int64
-	var currentCost float64
-	for _, sess := range m.sessions {
-		if sess != nil && sess.Usage != nil {
-			currentInput += sess.Usage.TotalUsage.TotalInput()
-			currentOutput += sess.Usage.TotalUsage.OutputTokens
-			currentCost += sess.Usage.EstimatedCost
-		}
-	}
-
-	lines = append(lines, sectionHeaderStyle.Render("Active Sessions"))
-	lines = append(lines, fmt.Sprintf("  Sessions:    %d", len(m.sessions)))
-	lines = append(lines, fmt.Sprintf("  Input:       %s tokens", formatTokensLarge(currentInput)))
-	lines = append(lines, fmt.Sprintf("  Output:      %s tokens", formatTokensLarge(currentOutput)))
-	lines = append(lines, fmt.Sprintf("  Est. Cost:   $%.2f", currentCost))
-	lines = append(lines, "")
-
-	// Global historical usage
-	lines = append(lines, sectionHeaderStyle.Render("All-Time (Local JSONL)"))
-	if m.globalUsage != nil {
-		lines = append(lines, fmt.Sprintf("  Projects:    %d", m.globalUsage.ProjectCount))
-		lines = append(lines, fmt.Sprintf("  Sessions:    %d", m.globalUsage.SessionCount))
-		lines = append(lines, fmt.Sprintf("  Input:       %s tokens", formatTokensLarge(m.globalUsage.TotalUsage.TotalInput())))
-		lines = append(lines, fmt.Sprintf("  Output:      %s tokens", formatTokensLarge(m.globalUsage.TotalUsage.OutputTokens)))
-		lines = append(lines, fmt.Sprintf("  Est. Cost:   $%.2f", m.globalUsage.EstimatedCost))
-	} else {
-		lines = append(lines, mutedStyle.Render("  Loading..."))
-	}
-
-	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("Press any key to close"))
-
-	content := strings.Join(lines, "\n")
-
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorPrimary).
-		Padding(1, 2).
-		Render(content)
-}
-
 func (m *Model) viewInputOverlay() string {
 	inputBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -764,9 +718,20 @@ func (m *Model) viewInputOverlay() string {
 		Padding(1, 2).
 		Width(50)
 
-	title := titleStyle.Render("New Session Name:")
+	var title, help string
+	if m.renameMode {
+		title = titleStyle.Render("Rename Session:")
+		help = helpStyle.Render("[Enter] Rename  [Esc] Cancel")
+	} else {
+		if m.workspaceMode && m.selectedPath != "" {
+			repoName := filepath.Base(m.selectedPath)
+			title = titleStyle.Render(fmt.Sprintf("New Session for %s:", repoName))
+		} else {
+			title = titleStyle.Render("New Session Name:")
+		}
+		help = helpStyle.Render("[Enter] Create  [Esc] Cancel")
+	}
 	input := m.inputField.View()
-	help := helpStyle.Render("[Enter] Create  [Esc] Cancel")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
