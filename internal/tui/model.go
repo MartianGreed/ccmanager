@@ -284,7 +284,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.promptField.SetWidth(promptWidth)
 		if m.pathPickerMode {
-			m.pathPickerList.SetSize(msg.Width-18, msg.Height-18)
+			listHeight := msg.Height - 10
+			if listHeight < 5 {
+				listHeight = 5
+			}
+			m.pathPickerList.SetSize(msg.Width-10, listHeight)
 		}
 	}
 
@@ -625,6 +629,16 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		m.confirmQuit = true
 		return nil
 
+	case "esc":
+		if m.selected < len(m.sessions) {
+			session := m.sessions[m.selected]
+			if session.State == claude.StateUrgent || session.State == claude.StateActive || session.State == claude.StateThinking {
+				_ = m.tmux.SendKeysToPaneRaw(session.Name, session.ClaudePane, "Escape")
+				m.addActivity(session.Name, "Sent Escape")
+				return nil
+			}
+		}
+
 	case "?":
 		m.showHelp = true
 
@@ -865,12 +879,16 @@ func (m *Model) buildPathList() list.Model {
 		items = append(items, pathItem{path: cwd, source: "cwd"})
 	}
 
-	l := list.New(items, newPathDelegate(), 0, 0)
+	// Calculate list size: container(height-4) - border(2) - padding(2) - help+empty(2) = height-10
+	listHeight := m.height - 10
+	if listHeight < 5 {
+		listHeight = 5
+	}
+	l := list.New(items, newPathDelegate(), m.width-10, listHeight)
 	l.Title = m.pathPickerTitle()
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = l.Styles.Title.Foreground(colorPrimary).Bold(true)
-	l.SetSize(m.width-18, m.height-18)
 	return l
 }
 
