@@ -91,10 +91,10 @@ func (m *Model) View() string {
 		borderOverhead = 4 // horizontal dividers
 	)
 
-	// Calculate prompt panel height (dynamic based on textarea content)
+	// Calculate prompt panel height (use textarea's actual configured height)
 	promptLines := 1 // header
 	if m.promptMode {
-		promptLines += strings.Count(m.promptField.Value(), "\n") + 1
+		promptLines += m.promptField.Height()
 	} else {
 		promptLines += 1 // hint line
 	}
@@ -467,7 +467,23 @@ func (m *Model) viewPreview(width, height int) string {
 		content = m.previewCache[sess.Name]
 	}
 	if content != "" {
-		contentLines := strings.Split(strings.TrimSpace(content), "\n")
+		// Wrap lines to fit preview width
+		rawLines := strings.Split(strings.TrimSpace(content), "\n")
+		var contentLines []string
+		maxLineWidth := width - 2
+		if maxLineWidth < 10 {
+			maxLineWidth = 10
+		}
+		for _, line := range rawLines {
+			if ansi.StringWidth(line) <= maxLineWidth {
+				contentLines = append(contentLines, line)
+			} else {
+				// Wrap long lines
+				wrapped := ansi.Hardwrap(line, maxLineWidth, false)
+				contentLines = append(contentLines, strings.Split(wrapped, "\n")...)
+			}
+		}
+
 		availableHeight := height - len(lines) - 1
 		scrollPos := m.previewScrollPos[sess.Name]
 
@@ -490,9 +506,6 @@ func (m *Model) viewPreview(width, height int) string {
 		}
 
 		for _, line := range contentLines[start:end] {
-			if ansi.StringWidth(line) > width-2 {
-				line = ansi.Truncate(line, width-2, "")
-			}
 			lines = append(lines, " "+line)
 			if len(lines) >= height-1 {
 				break
@@ -756,12 +769,18 @@ func (m *Model) viewPathPicker() string {
 	listView := m.pathPickerList.View()
 	content := lipgloss.JoinVertical(lipgloss.Left, listView, "", help)
 
+	// Calculate available height: total - border(2) - padding(2)
+	availableHeight := m.height - 4
+	if availableHeight < 10 {
+		availableHeight = 10
+	}
+
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorPrimary).
 		Padding(1, 2).
 		Width(m.width - 4).
-		Height(m.height - 4).
+		MaxHeight(availableHeight).
 		Render(content)
 }
 

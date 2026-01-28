@@ -179,14 +179,19 @@ func (c *Client) SendKeysToPane(session string, pane *Pane, keys string) error {
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	time.Sleep(10 * time.Millisecond)
-	// Send double Enter for multi-line content (3+ lines) to signal paste completion
-	args := []string{"send-keys", "-t", target, "Enter"}
-	if strings.Count(keys, "\n") >= 2 {
-		args = append(args, "Enter")
+	time.Sleep(50 * time.Millisecond)
+	// Send first Enter
+	cmd = exec.Command("tmux", "send-keys", "-t", target, "Enter")
+	if err := cmd.Run(); err != nil {
+		return err
 	}
-	cmd = exec.Command("tmux", args...)
-	return cmd.Run()
+	// Send second Enter for multi-line content to signal paste completion
+	if strings.Count(keys, "\n") >= 1 {
+		time.Sleep(30 * time.Millisecond)
+		cmd = exec.Command("tmux", "send-keys", "-t", target, "Enter")
+		return cmd.Run()
+	}
+	return nil
 }
 
 // SendKeysRaw sends keys to a tmux session without auto-Enter
