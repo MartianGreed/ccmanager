@@ -37,6 +37,7 @@ type DailyStats struct {
 	MaxStreak          float64
 	PomodorosCompleted int
 	FlowTimeSeconds    int
+	DailyCost          float64
 }
 
 // ActivityEntry represents a log entry
@@ -117,6 +118,12 @@ func (s *Store) migrate() error {
 		return fmt.Errorf("read migration 004: %w", err)
 	}
 	_, _ = s.db.Exec(string(schema4))
+
+	schema5, err := migrationsFS.ReadFile("migrations/005_daily_cost.sql")
+	if err != nil {
+		return fmt.Errorf("read migration 005: %w", err)
+	}
+	_, _ = s.db.Exec(string(schema5))
 
 	return nil
 }
@@ -239,7 +246,7 @@ func (s *Store) GetTodayStats() (*DailyStats, error) {
 	var stats DailyStats
 	err := s.db.QueryRow(`
 		SELECT date, total_score, total_actions, max_streak,
-		       pomodoros_completed, flow_time_seconds
+		       pomodoros_completed, flow_time_seconds, COALESCE(daily_cost, 0)
 		FROM daily_stats WHERE date = ?
 	`, today).Scan(
 		&stats.Date,
@@ -248,6 +255,7 @@ func (s *Store) GetTodayStats() (*DailyStats, error) {
 		&stats.MaxStreak,
 		&stats.PomodorosCompleted,
 		&stats.FlowTimeSeconds,
+		&stats.DailyCost,
 	)
 
 	if err == sql.ErrNoRows {
@@ -272,14 +280,15 @@ func (s *Store) GetTodayStats() (*DailyStats, error) {
 func (s *Store) UpdateTodayStats(stats *DailyStats) error {
 	_, err := s.db.Exec(`
 		INSERT INTO daily_stats (date, total_score, total_actions, max_streak,
-		                         pomodoros_completed, flow_time_seconds)
-		VALUES (?, ?, ?, ?, ?, ?)
+		                         pomodoros_completed, flow_time_seconds, daily_cost)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(date) DO UPDATE SET
 			total_score = excluded.total_score,
 			total_actions = excluded.total_actions,
 			max_streak = excluded.max_streak,
 			pomodoros_completed = excluded.pomodoros_completed,
 			flow_time_seconds = excluded.flow_time_seconds,
+			daily_cost = excluded.daily_cost,
 			updated_at = CURRENT_TIMESTAMP
 	`,
 		stats.Date,
@@ -288,6 +297,7 @@ func (s *Store) UpdateTodayStats(stats *DailyStats) error {
 		stats.MaxStreak,
 		stats.PomodorosCompleted,
 		stats.FlowTimeSeconds,
+		stats.DailyCost,
 	)
 
 	if err != nil {
@@ -507,6 +517,20 @@ func (s *Store) SetClaudeSessionID(sessionName, claudeSessionID string) error {
 	`, claudeSessionID, sessionName)
 	if err != nil {
 		return fmt.Errorf("set claude session id: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) AddToDailyCost(amount float64) error {
+	today := time.Now().Format("2006-01-02")
+	_, err := s.db.Exec(`
+		INSERT INTO daily_stats (date, daily_cost) VALUES (?, ?)
+		ON CONFLICT(date) DO UPDATE SET
+			daily_cost = daily_cost + ?,
+			updated_at = CURRENT_TIMESTAMP
+	`, today, amount, amount)
+	if err != nil {
+		return fmt.Errorf("add to daily cost: %w", err)
 	}
 	return nil
 }

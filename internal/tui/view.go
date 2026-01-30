@@ -175,6 +175,7 @@ func (m *Model) viewHeader(width int) string {
 	}
 
 	score := statStyle.Render(fmt.Sprintf("SCORE: %s", formatScore(m.score)))
+	cost := statStyle.Render(fmt.Sprintf("COST: $%.2f", m.dailyCost))
 
 	pomodoroStr := m.formatPomodoro()
 	pomodoro := statStyle.Render(pomodoroStr)
@@ -187,7 +188,7 @@ func (m *Model) viewHeader(width int) string {
 	if usageStr != "" {
 		statParts = append(statParts, statStyle.Render(usageStr))
 	}
-	statParts = append(statParts, apm, streak, score, pomodoro)
+	statParts = append(statParts, cost, apm, streak, score, pomodoro)
 	stats := strings.Join(statParts, "  │  ")
 	statsWidth := lipgloss.Width(stats)
 	titleWidth := lipgloss.Width(title)
@@ -467,21 +468,10 @@ func (m *Model) viewPreview(width, height int) string {
 		content = m.previewCache[sess.Name]
 	}
 	if content != "" {
-		// Wrap lines to fit preview width
-		rawLines := strings.Split(strings.TrimSpace(content), "\n")
-		var contentLines []string
+		contentLines := strings.Split(strings.TrimSpace(content), "\n")
 		maxLineWidth := width - 2
 		if maxLineWidth < 10 {
 			maxLineWidth = 10
-		}
-		for _, line := range rawLines {
-			if ansi.StringWidth(line) <= maxLineWidth {
-				contentLines = append(contentLines, line)
-			} else {
-				// Wrap long lines
-				wrapped := ansi.Hardwrap(line, maxLineWidth, false)
-				contentLines = append(contentLines, strings.Split(wrapped, "\n")...)
-			}
 		}
 
 		availableHeight := height - len(lines) - 1
@@ -506,7 +496,7 @@ func (m *Model) viewPreview(width, height int) string {
 		}
 
 		for _, line := range contentLines[start:end] {
-			lines = append(lines, " "+line)
+			lines = append(lines, " "+ansi.Truncate(line, maxLineWidth, "")+"\x1b[0m")
 			if len(lines) >= height-1 {
 				break
 			}

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -74,6 +76,8 @@ type Model struct {
 	score          int
 	pomodoroState  game.PomodoroState
 	pomodoroRemain time.Duration
+	dailyCost      float64
+	costPollTick   int
 
 	// Error state
 	lastError error
@@ -130,7 +134,7 @@ func New(monitor *daemon.Monitor, engine *game.Engine, store *store.Store, cfg *
 
 	prompt := textarea.New()
 	prompt.Placeholder = "Type command and press Enter..."
-	prompt.CharLimit = 4096
+	prompt.CharLimit = 0
 	prompt.SetHeight(2)
 	prompt.ShowLineNumbers = false
 	prompt.SetWidth(60)
@@ -554,6 +558,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, tea.Batch(cmds...)
 				}
+			case "ctrl+v":
+				clip, err := readClipboard()
+				if err == nil && clip != "" {
+					m.promptField.InsertString(clip)
+					m.autoGrowPrompt()
+				}
+				return m, tea.Batch(cmds...)
 			case "shift+tab":
 				if m.selected < len(m.sessions) {
 					session := m.sessions[m.selected]
@@ -1013,6 +1024,13 @@ func (m *Model) updateGameState() {
 	m.score = m.engine.Score()
 	m.pomodoroState = m.engine.Pomodoro().State()
 	m.pomodoroRemain = m.engine.Pomodoro().Remaining()
+	m.costPollTick++
+	if m.costPollTick >= 25 && m.store != nil {
+		m.costPollTick = 0
+		if stats, err := m.store.GetTodayStats(); err == nil {
+			m.dailyCost = stats.DailyCost
+		}
+	}
 }
 
 func (m *Model) validateControlGroups() {
@@ -1194,6 +1212,23 @@ func (m *Model) handleInteractiveKey(msg tea.KeyMsg) tea.Cmd {
 		m.interactiveMode = false
 	}
 	return nil
+}
+
+func readClipboard() (string, error) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("pbpaste")
+	case "linux":
+		cmd = exec.Command("xclip", "-selection", "clipboard", "-o")
+	default:
+		return "", fmt.Errorf("unsupported platform")
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 func max(a, b int) int {
