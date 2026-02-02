@@ -66,6 +66,7 @@ type Monitor struct {
 	debug         bool
 	usageWatcher  *usage.Watcher
 	usagePollTick int
+	lastCosts     map[string]float64
 }
 
 // NewMonitor creates a new session monitor
@@ -80,6 +81,7 @@ func NewMonitor(pollInterval time.Duration, st *store.Store) *Monitor {
 		eventCh:      make(chan Event, 100),
 		debug:        os.Getenv("CCMANAGER_DEBUG") == "1",
 		usageWatcher: usage.NewWatcher(5 * time.Second),
+		lastCosts:    make(map[string]float64),
 	}
 }
 
@@ -185,6 +187,18 @@ func (m *Monitor) updateUsage() {
 			sess.Usage = sessionUsage
 		}
 		m.mu.Unlock()
+
+		if sessionUsage.EstimatedCost > 0 {
+			last, exists := m.lastCosts[name]
+			current := sessionUsage.EstimatedCost
+			if exists {
+				delta := current - last
+				if delta > 0 && m.store != nil {
+					_ = m.store.AddToDailyCost(delta)
+				}
+			}
+			m.lastCosts[name] = current
+		}
 	}
 }
 
@@ -371,6 +385,7 @@ func (m *Monitor) poll() {
 		if !seen[name] {
 			m.usageWatcher.UnwatchSession(name)
 			delete(m.sessions, name)
+			delete(m.lastCosts, name)
 			m.eventCh <- Event{
 				Type:    EventSessionClosed,
 				Session: name,

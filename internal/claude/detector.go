@@ -70,6 +70,7 @@ func NewDetector() *Detector {
 			regexp.MustCompile(`(?i)Hit enter`),
 			regexp.MustCompile(`(?i)chat about this`),
 			regexp.MustCompile(`(?i)skip interview and plan`),
+			regexp.MustCompile(`(?i)Ready to submit your answers`),
 		},
 		thinkingPatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?i)thinking\.{3}`),
