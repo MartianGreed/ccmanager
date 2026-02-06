@@ -209,6 +209,21 @@ func (m *Monitor) findClaudePane(session string) (*tmux.Pane, string) {
 		return nil, ""
 	}
 
+	// First pass: check active pane
+	for _, p := range panes {
+		if !p.Active {
+			continue
+		}
+		content, err := m.tmux.CapturePane(session, p.WindowIndex, p.PaneIndex)
+		if err != nil {
+			continue
+		}
+		if m.detector.IsClaudeSession(content) {
+			pane := p
+			return &pane, content
+		}
+	}
+	// Second pass: check all panes if active pane isn't Claude
 	for _, p := range panes {
 		content, err := m.tmux.CapturePane(session, p.WindowIndex, p.PaneIndex)
 		if err != nil {
